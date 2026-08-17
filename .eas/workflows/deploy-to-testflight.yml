@@ -49,6 +49,11 @@ jobs:
     name: Submit to TestFlight
     type: submit
     needs: [build_ios]
+    # Without this, a credentials failure reports only "eas-cli failed to resolve
+    # submission config" and tells you to turn this on — which costs a whole
+    # build to learn. It is on permanently so the first failure is the useful one.
+    env:
+      EXPO_DEBUG: '1'
     params:
       build_id: ${{ needs.build_ios.outputs.build_id }}
       profile: production
