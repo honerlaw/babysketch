@@ -11,6 +11,7 @@
 - [escalated to user] scope check: panel deadlocked 1/3 twice — dissenters wanted bulk 50+ drawing authoring split into a follow-on unit; user chose "one unit + hard freeze gate", keeping the full 52 in this unit with a Stage A seed / freeze / Stage B ordering
 - [3/3 accept] approach selection: option B, declarative shape-composed SVG with regions as first-class data (rejected: A — Skia raster flood fill, jank + fill leakage + PNG-per-drawing storage + unsolved artwork pipeline; C — SVG/Skia hybrid, pays A's costs and doubles the surface area)
 - [3/3 accept] whole-proposal acceptance (round 2, after 1/3 in round 1): round 1 dissent was that no test framework was named though 4 of 13 success criteria depend on `npm test`; closed by verifying the toolchain empirically before re-voting
+- [3/3 accept] completion verification: all three panellists independently re-ran `tsc`, `expo lint` and `jest`; accepted that criteria 1-6 and 13-15 are fully met, that 7 is met against a statically rendered DOM, and that 8-12 have their logic tested but their gesture wiring unverified for want of a simulator
 
 ## Panel concerns 2026-08-17
 
@@ -94,3 +95,32 @@ from an unverifiable claim into a real check against the produced DOM:
 - **Zero visible text nodes** in `<body>` after stripping tags, scripts and styles.
 - 36 `aria-label`s survive, so the wordless UI is still navigable by a parent's
   screen reader.
+
+## Panel concerns 2026-08-17 (completion verification)
+
+Carried into the review phase rather than fixed at the gate:
+
+- **[high] Silent save failures.** `artwork-store.ts` wraps `ensureDir`, `loadArtwork` and
+  `saveArtwork` in try/catch with empty or comment-only catch blocks. Degrading a corrupt
+  *load* to a blank picture is deliberate and right; extending the same silence to *saves*
+  means a child's colouring can vanish — disk full, permission denial, storage eviction —
+  with no log, no retry and no indicator. The architecture currently has no path to ever
+  learning a save failed.
+- **[high] The clipping claim is over-stated by one word.** The `qlmanage` check exercises
+  WebKit's SVG renderer, not react-native-svg's CoreGraphics (iOS) or Skia-derived (Android)
+  backends, which is the exact divergence the approach panel asked about. Saying "the
+  clipping half is verified" drops that hedge; the honest claim is "verified against a
+  standards SVG renderer; native backends unverified".
+- **[medium] The wordlessness test matches tag names, not import provenance.**
+  `react-native-svg` exports its own `Text`; an aliased import would slip past. No such
+  usage exists today.
+- **[medium] The static-render check covers 36 of 52 thumbnails** (virtualisation) and is a
+  one-off manual `expo export` inspection, not a CI-gated assertion that would catch a
+  regression.
+- **[low] Gesture objects are rebuilt every render** in `coloring-canvas.tsx` and
+  `color-wheel.tsx`. Deliberate, so `onFinalize` closes over the current points, but
+  non-idiomatic for `GestureDetector`.
+- **[low] Dead tap handler.** Each colour-wheel sector carries `onPress` while the wrapping
+  `GestureDetector` runs `Gesture.Pan().minDistance(0)` whose `onBegin` already selects; the
+  pan recogniser likely claims the touch first.
+- **[low] Only the web bundle was checked**, never the native Metro bundle.
