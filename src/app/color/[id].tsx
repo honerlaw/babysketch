@@ -7,13 +7,8 @@ import { ColorWheel } from '@/components/color-wheel';
 import { ColoringCanvas, type CanvasMode } from '@/components/coloring-canvas';
 import { IconButton } from '@/components/icon-button';
 import { getDrawing } from '@/drawings';
-import {
-  type ColoringState,
-  type Stroke,
-  clampStrokes,
-  emptyState,
-  pushUndo,
-} from '@/lib/artwork-state';
+import { type ColoringState, type Stroke, emptyState, pushUndo } from '@/lib/artwork-state';
+import { applyClear, applyFill, applyStroke } from '@/lib/coloring-actions';
 import { loadArtwork, saveArtwork } from '@/lib/artwork-store';
 import { HUES } from '@/lib/palette';
 
@@ -82,7 +77,7 @@ export default function ColorScreen() {
 
   const handleFill = useCallback(
     (shapeIndex: number) => {
-      mutate((prev) => ({ ...prev, fills: { ...prev.fills, [String(shapeIndex)]: color } }));
+      mutate((prev) => applyFill(prev, shapeIndex, color));
       scheduleSave();
     },
     [color, mutate, scheduleSave],
@@ -90,7 +85,7 @@ export default function ColorScreen() {
 
   const handleStroke = useCallback(
     (stroke: Stroke) => {
-      mutate((prev) => ({ ...prev, strokes: clampStrokes([...prev.strokes, stroke]) }));
+      mutate((prev) => applyStroke(prev, stroke));
       scheduleSave();
     },
     [mutate, scheduleSave],
@@ -107,7 +102,7 @@ export default function ColorScreen() {
 
   // Long-press only, and it pushes the pre-clear state so one undo brings it back.
   const handleClear = useCallback(() => {
-    mutate(() => emptyState());
+    mutate(applyClear);
     scheduleSave();
   }, [mutate, scheduleSave]);
 
