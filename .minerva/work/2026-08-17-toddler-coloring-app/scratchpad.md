@@ -79,7 +79,18 @@ written:
 - Separately, `react-hooks/exhaustive-deps` treats any dependency ending in `.current`
   as a ref and warns it is not a valid dependency — even when it is a plain state
   field. The canvas screen's editor state therefore names its field `art`, not
-  `current`; that rename in commit `e5cb7e8` is the whole reason for the name.
+  `current`.
+
+  **Correction, after a review pass checked this claim.** An earlier version of this
+  note said the rename "is commit `e5cb7e8`". That is wrong, and the reviewer was right
+  to call it: `e5cb7e8`'s diff goes straight from a state variable named `state` to
+  `Editor { art, undo }`, with no field called `current` anywhere in it. The combined
+  state object was first written with its field named `current`, lint emitted
+  *"Mutable values like 'editor.current' aren't valid dependencies"*, and the rename to
+  `art` happened in the working tree before anything was committed — so no commit shows
+  it. The lesson holds and the warning text is quoted verbatim, but this is testimony,
+  not a diff, exactly like the rest of this back-filled section. Recorded this way so a
+  future reader weighs it accordingly.
 
 ## Stage B 2026-08-17
 
