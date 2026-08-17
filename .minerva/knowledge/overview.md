@@ -1,0 +1,75 @@
+# Knowledge overview
+
+Everything here comes from one work unit: turning an empty Expo starter into BabySketch, a
+wordless colouring app for toddlers. Three themes run through it.
+
+## Pictures as data, not assets
+
+The decision that shaped everything else was refusing to treat drawings as images.
+[[2026-08-17-pattern-drawings-as-declarative-shape-data]] describes the format: each subject
+is an array of shapes whose SVG path data serves as *both* the colourable region and the
+black outline. That single choice makes a bucket fill an O(1) property flip instead of a
+pixel flood fill, makes leaking past a line structurally impossible rather than a tuning
+problem, and — the part that decided the whole approach — makes hand-authoring 52 subjects
+tractable at roughly a dozen lines each, with no artwork pipeline to build.
+
+Data that cheap to write is also cheap to write *wrong*, so the entry's authoring rules are
+enforced by a machine-checked registry test rather than by care. The rules read like
+trivia — decoration last, ears must poke past the head, smoothing helpers overshoot their
+own control points — but each one exists because the validator rejected a real drawing.
+
+[[2026-08-17-decision-seed-then-freeze-bulk-authoring]] is the ordering that let that format
+settle before 46 more drawings were authored against it: build the engine against a handful
+of deliberately awkward seeds, freeze the format in its own commit, then bulk-author. Its
+more general lesson is about process — two review panels insisted the answer was "split this
+into two work units", when what they actually wanted was "prove the schema before paying the
+bulk cost". Satisfying the mechanism directly beat obeying the ceremony, and preserved the
+scope the user had asked for.
+
+## Keeping what the child coloured
+
+Two entries are both defects found by the same review pass, and both are about a save that
+looks correct and is not.
+
+[[2026-08-17-constraint-fills-keyed-by-geometry]] is the quieter of the two. Keying each
+region's colour by its index in the shapes array reads fine and corrupts silently: insert one
+decorative spot into a drawing a year from now and every saved colour on every device shifts
+to the wrong region, with a version field that cannot detect it because the payload's shape
+never changed — only its meaning. Keying on the region's own geometry fixes it, and the fix
+is free before release and a migration after.
+
+[[2026-08-17-pattern-write-through-cache-beats-focus-race]] is a timing bug with a general
+shape: a list screen that re-reads on focus racing an editor that writes on a debounce.
+expo-router fires `focus` before react-native-screens has finished unmounting the popped
+screen, so the read can beat the write. The lesson is the fix's shape rather than its
+details — a write-through cache *removes* the race, where a shorter debounce would only have
+narrowed it.
+
+## Fighting the toolchain
+
+Two entries are pure friction, recorded so nobody pays for them twice.
+
+[[2026-08-17-constraint-expo57-ts6-test-toolchain]] collects the three non-obvious pins a
+jest setup needs on Expo SDK 57 — TypeScript 6 not auto-including `@types/jest`,
+`babel-preset-expo` throwing under `@babel/core@8`, and why jest's Babel presets must be
+inline so Metro never sees them. Its most useful line is the last: those three failures
+surface at *different* gates, so a change here has to be checked against both the typecheck
+and an actual bundle.
+
+[[2026-08-17-constraint-react19-hook-lint-gestures]] explains why the gesture code looks the
+way it does. React 19's hook lint rules reject the natural ref-based implementation and then
+reject the obvious workaround, leaving state-based handlers on a gesture rebuilt each render
+as the shape that passes. Anyone "optimising" that back toward a memoised ref will
+reintroduce five lint errors. It is also the corpus's one entry recorded as testimony rather
+than diff — the failed attempts were never committed, and a review pass caught a wrong commit
+citation in an earlier draft of it.
+
+## Limitations
+
+A link here attests synthesis **intent**, not entry **content**: an entry can stay linked
+from a narrative that no longer describes it, and nothing detects that. Entries promoted
+after this synthesis show as un-synthesized until the next refresh.
+
+This corpus is one work unit deep. The themes above are real but narrow, and several entries
+generalise further than the single project they came from — treat the framing as provisional
+until a second unit either confirms or complicates it.

@@ -61,3 +61,4 @@ since every region is known ahead of time.
 ## Related
 - [[2026-08-17-constraint-fills-keyed-by-geometry]] — how a region's colour is persisted, and why not by index
 - [[2026-08-17-decision-seed-then-freeze-bulk-authoring]] — the ordering that let this format settle before 46 more drawings were authored against it
+- [[2026-08-17-pattern-write-through-cache-beats-focus-race]] — see also
