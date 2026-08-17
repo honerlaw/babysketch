@@ -56,3 +56,41 @@ interactive criteria — 7, 8, 9, 10, 11, 12 — were NOT exercised by hand. Wha
 mechanically: the web bundle builds and serves (HTTP 200, 7.3MB, resolving react-native-svg,
 expo-file-system and gesture-handler), typecheck, lint, and the full test suite. The
 interactive criteria remain unverified and are reported as such.
+
+## Stage B 2026-08-17
+
+46 more subjects authored against the frozen format, for 52 total: 16 land animals,
+11 sea (10 creatures plus an ice cream, so the gallery is not wall-to-wall animals),
+8 birds and bugs, 11 everyday objects.
+
+Three authoring rules emerged and are now the house style, each because the validator
+caught the violation:
+
+- **Decoration goes last.** A spot or stripe added before the body trips the
+  covered-region check, because the body's bounding box then encloses it. Put
+  decorative regions after every structural one and the check passes by construction.
+- **Ears must poke past the head.** Same check, same reason: an ear entirely inside
+  the head's bounding box reads as untappable and is rejected.
+- **`blobPath` overshoots its own control points.** Smoothing a shape with square
+  corners pushed the dolphin's wave to x[-12.2, 112.2] — well outside a 100-unit
+  viewBox. Bands with straight edges use the new `wave()` helper instead, and the
+  heart needed explicit cubics rather than any composition of primitives, because
+  circles-plus-a-triangle leaves the triangle's top edge drawn straight through the
+  middle once the outline layer paints.
+
+Redrawn after looking at a rendered contact sheet of all 52: the heart (was unreadable
+as a heart), the apple, the flamingo (read as a goose), and one weak composition
+replaced outright by the ice cream.
+
+## Static-render verification 2026-08-17
+
+`npx expo export --platform web` static-renders the routes, which turned criterion 7
+from an unverifiable claim into a real check against the produced DOM:
+
+- 36 `<svg>` thumbnails in the gallery route (36 rather than 52 is `initialNumToRender`
+  plus `windowSize` — the virtualization working), 823 `<path>` elements, and 72
+  clip-path references, i.e. two per thumbnail: the `<clipPath>` definition and the
+  attribute referencing it.
+- **Zero visible text nodes** in `<body>` after stripping tags, scripts and styles.
+- 36 `aria-label`s survive, so the wordless UI is still navigable by a parent's
+  screen reader.

@@ -48,6 +48,46 @@ export const wave = (
   return poly(pts);
 };
 
+/**
+ * A heart. Written out as explicit cubics rather than composed from primitives:
+ * the two lobes and the point need control over the tangents, and every attempt to
+ * fake it with circles plus a triangle leaves the triangle's top edge showing
+ * straight through the middle once the outline layer draws.
+ */
+export const heart = (cx: number, cy: number, w: number, h: number): string => {
+  const hw = w / 2;
+  const hh = h / 2;
+  const x = (t: number) => cx + t * hw;
+  const y = (t: number) => cy + t * hh;
+  return [
+    `M ${x(0)} ${y(1)}`,
+    `C ${x(-0.72)} ${y(0.42)} ${x(-1)} ${y(-0.06)} ${x(-1)} ${y(-0.34)}`,
+    `C ${x(-1)} ${y(-0.72)} ${x(-0.72)} ${y(-1)} ${x(-0.42)} ${y(-1)}`,
+    `C ${x(-0.22)} ${y(-1)} ${x(-0.06)} ${y(-0.86)} ${x(0)} ${y(-0.66)}`,
+    `C ${x(0.06)} ${y(-0.86)} ${x(0.22)} ${y(-1)} ${x(0.42)} ${y(-1)}`,
+    `C ${x(0.72)} ${y(-1)} ${x(1)} ${y(-0.72)} ${x(1)} ${y(-0.34)}`,
+    `C ${x(1)} ${y(-0.06)} ${x(0.72)} ${y(0.42)} ${x(0)} ${y(1)}`,
+    'Z',
+  ].join(' ');
+};
+
+/** A pointed star as one closed polygon. */
+export const star = (
+  cx: number,
+  cy: number,
+  outer: number,
+  inner: number,
+  points = 5,
+): string => {
+  const pts: [number, number][] = [];
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = (i * Math.PI) / points - Math.PI / 2;
+    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return poly(pts);
+};
+
 /** Two eyes at a mirrored offset — by far the most repeated detail in the set. */
 export const eyes = (cx: number, cy: number, dx: number, r = 2.6): Shape[] => [
   k(cir(cx - dx, cy, r)),
