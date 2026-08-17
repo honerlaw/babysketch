@@ -59,6 +59,28 @@ mechanically: the web bundle builds and serves (HTTP 200, 7.3MB, resolving react
 expo-file-system and gesture-handler), typecheck, lint, and the full test suite. The
 interactive criteria remain unverified and are reported as such.
 
+## React 19 hook lint, during Stage A 2026-08-17
+
+Back-filled: this cost real time during Stage A and I failed to write it down at the
+time, which a later review pass rightly could not verify.
+
+`eslint-plugin-react-hooks` 7.x ships error-level rules that shaped how the canvas is
+written:
+
+- `react-hooks/refs` — "Cannot access refs during render". The first `ColoringCanvas`
+  kept the in-progress stroke in a `useRef` and built `Gesture.Pan()` inside a
+  `useMemo` from handlers that read `livePoints.current`. Passing those handlers to
+  `.onEnd()`/`.onFinalize()` counts as accessing the ref during render, five errors.
+- `react-hooks/set-state-in-effect` then rejected the obvious workaround — setting an
+  `ending` flag and committing the finished stroke from an effect.
+- What actually works: keep the in-progress points in **state**, and build the gesture
+  fresh each render (not memoised) so `onFinalize` closes over the current list. Every
+  added point re-renders anyway, so there is nothing to memoise away.
+- Separately, `react-hooks/exhaustive-deps` treats any dependency ending in `.current`
+  as a ref and warns it is not a valid dependency — even when it is a plain state
+  field. The canvas screen's editor state therefore names its field `art`, not
+  `current`; that rename in commit `e5cb7e8` is the whole reason for the name.
+
 ## Stage B 2026-08-17
 
 46 more subjects authored against the frozen format, for 52 total: 16 land animals,
@@ -83,6 +105,14 @@ caught the violation:
 Redrawn after looking at a rendered contact sheet of all 52: the heart (was unreadable
 as a heart), the apple, the flamingo (read as a goose), and one weak composition
 replaced outright by the ice cream.
+
+Small corrections the validator or the contact sheet caught, recorded for completeness
+rather than because any of them is interesting: the bee's antennae were 5 units wide and
+the minimum-region floor rejected them at 6, so they went to 7; the ice cream's top scoop
+sat above y=0 and was nudged back inside the viewBox; the dolphin used the mirrored
+`eyes()` helper with `dx: 0` and stacked both eyes at one point. The bee case is worth one
+sentence of interpretation: it is the minimum-region floor doing exactly its job on a
+real drawing rather than in theory.
 
 ## Static-render verification 2026-08-17
 
@@ -194,3 +224,12 @@ toddler, it needs a run on an iOS or Android simulator** covering paint containm
 colouring modes, wheel selection, undo, long-press clear, and a force-quit/relaunch. The
 fix for finding 2 in particular is a best-effort fix for a timing race that cannot be
 confirmed shut without a device.
+
+## Open question resolved 2026-08-17
+
+The proposal asked whether the 6-unit minor-axis floor is a real tappability bar or just
+a proxy. Answer from authoring all 52: the floor held and was never raised. It rejected
+exactly one region across the whole set — the bee's antennae at 5 units — and widening
+them to 7 was the right call rather than evidence the floor was wrong. It remains a
+bounding-box proxy, so a long diagonal sliver could still pass it; nothing in this set is
+shaped that way, and the chunky house style is what keeps that true.
