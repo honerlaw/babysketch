@@ -23,3 +23,36 @@ Carried forward from the proposal panel (fix before marking the related criterio
 
 - The 6-unit minor-axis bounding-box floor is a proxy for tappability, not a proof — a diagonal sliver can pass it. Raise the floor during Stage A if seed authoring shows regions that feel hard to hit.
 - Criteria 13 and 15 are manual checks, not machine-verifiable, unlike 1-6 and 14.
+
+## Stage A findings 2026-08-17
+
+The two checks the approach panel demanded before anything else:
+
+- **Multi-child `<ClipPath>` unions correctly.** Verified by rendering the real drawing
+  data through the exact layer structure `ColoringCanvas` emits, with a stroke authored to
+  run deliberately off the subject (`p: [2, 8, 30, 40, 55, 55, 95, 92]`), then rasterising
+  with `qlmanage` (WebKit). On both the cat and the dolphin the stroke appears only inside
+  the subject's regions and nowhere on the background. No fallback needed, so no replan.
+  Caveat: this exercises a standards SVG renderer, not react-native-svg's iOS/Android
+  backends. The SVG structure is right; per-platform behaviour is unverified here.
+- **Overlapping regions stay individually addressable.** Array order determines both paint
+  order and tap precedence as designed — confirmed by the butterfly (body over four wings)
+  and the cat (head over ears): each region renders separately and none is swallowed.
+
+Cosmetic finding, accepted rather than fixed: because the outline layer draws last, the
+outline of a shape that sits *behind* another is still visible through it (an ear's base
+across the head, the giraffe's neck edges across the body). It reads as chunky segmented
+parts, and each visible line is a genuine region boundary the child can fill — so it works
+*for* the product rather than against it. Not a divergence from the proposal; it is what
+"outline drawn last" necessarily looks like.
+
+Fixed while looking: the dolphin used the mirrored `eyes()` helper with `dx: 0`, stacking
+both eyes at one point. Side-on subjects now use a new single `eye()` helper.
+
+## Verification not possible in this environment 2026-08-17
+
+No browser automation (the Chrome extension is not connected) and no simulator, so the
+interactive criteria — 7, 8, 9, 10, 11, 12 — were NOT exercised by hand. What was verified
+mechanically: the web bundle builds and serves (HTTP 200, 7.3MB, resolving react-native-svg,
+expo-file-system and gesture-handler), typecheck, lint, and the full test suite. The
+interactive criteria remain unverified and are reported as such.

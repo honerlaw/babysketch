@@ -1,98 +1,82 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useCallback, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { DrawingThumbnail } from '@/components/drawing-thumbnail';
+import { DRAWINGS, DRAWING_IDS } from '@/drawings';
+import { type ColoringState, emptyState } from '@/lib/artwork-state';
+import { loadAllArtwork } from '@/lib/artwork-store';
+import { INK } from '@/lib/palette';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+const COLUMNS = 3;
+const GAP = 10;
+
+export default function GalleryScreen() {
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const [saved, setSaved] = useState<Record<string, ColoringState>>({});
+
+  // One batched read per focus rather than 52 synchronous reads on mount.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      loadAllArtwork(DRAWING_IDS).then((all) => {
+        if (alive) setSaved(all);
+      });
+      return () => {
+        alive = false;
+      };
+    }, []),
   );
-}
 
-export default function HomeScreen() {
+  const cell = Math.floor((width - GAP * (COLUMNS + 1)) / COLUMNS);
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <FlatList
+        data={DRAWINGS}
+        keyExtractor={(d) => d.id}
+        numColumns={COLUMNS}
+        initialNumToRender={12}
+        windowSize={5}
+        removeClippedSubviews
+        contentContainerStyle={styles.list}
+        columnWrapperStyle={styles.row}
+        renderItem={({ item }) => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Colour the ${item.id}`}
+            onPress={() => router.push(`/color/${item.id}`)}
+            style={({ pressed }) => [
+              styles.cell,
+              { width: cell, height: cell },
+              pressed && styles.pressed,
+            ]}
+          >
+            <DrawingThumbnail
+              drawing={item}
+              state={saved[item.id] ?? emptyState()}
+              size={cell - 8}
+            />
+          </Pressable>
+        )}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
+  safe: { flex: 1, backgroundColor: '#FBF7F0' },
+  list: { padding: GAP, gap: GAP },
+  row: { gap: GAP },
+  cell: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: INK,
   },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  pressed: { opacity: 0.7 },
 });
