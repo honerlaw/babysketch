@@ -6,6 +6,8 @@
 
 ## Bugs
 
+- [[2026-08-17-bug-eas-npm-ci-lockfile-mismatch]] — npm 11 lockfiles omit hoisted peer deps that EAS's npm 10 `npm ci` demands
+
 ## Patterns
 
 - [[2026-08-17-pattern-drawings-as-declarative-shape-data]] — Drawings are shape arrays whose path data is both fillable region and outline

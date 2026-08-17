@@ -49,3 +49,4 @@ invisible to the test run, and finding 3 is invisible to the typecheck.
 
 ## Related
 - [[2026-08-17-constraint-react19-hook-lint-gestures]] — the other toolchain constraint this repo's setup has to live with
+- [[2026-08-17-bug-eas-npm-ci-lockfile-mismatch]] — see also
