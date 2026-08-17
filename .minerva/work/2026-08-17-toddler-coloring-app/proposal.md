@@ -1,7 +1,7 @@
 # Proposal: toddler-coloring-app
 
 **Date**: 2026-08-17
-**Status**: Draft
+**Status**: Shipped (2026-08-17)
 
 ## Goal
 
@@ -244,11 +244,24 @@ Each item is answerable yes/no by running a command or performing one stated act
 
 ## Open Questions
 
-- Whether `react-native-svg`'s multi-child `<ClipPath>` unions consistently across iOS and
-  Android is resolved empirically in Stage A rather than assumed; the fallback ladder is in the
-  Approach section and a fallback triggers a replan.
-- The 6-unit minor-axis floor is a proxy for tappability, not a proof of it. If seed authoring
-  shows chunky-style regions still feel hard to hit, the floor is raised during Stage A while
-  only 6 drawings exist.
-- Landscape orientation and tablet-specific layout are out of scope for this unit; the app is
-  portrait-locked. Sharing/printing artwork is also out of scope.
+- **Multi-child `<ClipPath>` union on `react-native-svg`.** Answered only against a standards
+  SVG renderer: the real drawing data was rendered through the exact layer structure the
+  canvas emits, with a stroke authored to run deliberately off the subject, and rasterised via
+  WebKit — the stroke stayed inside the subject and never touched the background. No fallback
+  was needed, so no replan was triggered. The iOS (CoreGraphics) and Android (Skia-derived)
+  backends remain unverified, and that is the substance of the open gap below rather than a
+  separate question.
+- **The 6-unit minor-axis floor.** Resolved: it held across all 52 subjects and was never
+  raised. It rejected exactly one region in the whole set — the bee's antennae at 5 units —
+  and widening them to 7 was the right response. It remains a bounding-box proxy, so a long
+  diagonal sliver could still pass it; nothing in this set is shaped that way, and the chunky
+  house style is what keeps that true.
+- **Still open, and the one real gap this unit ships with: the native rendering backends have
+  never been exercised.** No iOS or Android simulator and no browser automation were available
+  in this session. Criteria 8, 9, 10 and 12 have their logic covered by tests and their
+  rendering checked by rasterisation, but no finger ever drove the gestures; criterion 11's
+  disk round-trip never ran. Before this goes in front of an actual toddler it needs a
+  simulator pass over paint containment, both colouring modes, wheel selection, undo,
+  long-press clear, and force-quit/relaunch.
+- Landscape orientation, tablet-specific layout, and sharing or printing artwork stay out of
+  scope for this unit; the app is portrait-locked.
