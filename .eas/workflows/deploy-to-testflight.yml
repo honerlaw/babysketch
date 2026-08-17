@@ -1,0 +1,52 @@
+name: Deploy to TestFlight
+
+# Squash-merging a PR pushes a commit to main, so this fires on every merge.
+# Requires the GitHub repository to be connected to the EAS project — without
+# that link, push triggers never reach EAS and nothing runs.
+on:
+  push:
+    branches: ['main']
+
+# A newer merge supersedes an in-flight run: only the newest commit on main is
+# worth shipping, and build numbers auto-increment either way.
+concurrency:
+  group: ${{ workflow.filename }}-${{ github.ref }}
+  cancel_in_progress: true
+
+defaults:
+  image: sdk-57
+
+jobs:
+  # A cheap gate ahead of an expensive build. Typecheck, lint and the suite take
+  # seconds; an iOS build takes minutes of worker time. This also runs
+  # `npm ci` first, which is exactly what caught the lockfile/npm-version
+  # mismatch that broke the first build — so drift now fails here, cheaply,
+  # instead of a third of the way into a build.
+  check:
+    name: Typecheck, lint and test
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npx expo lint
+      - name: Test
+        run: npx jest
+
+  build_ios:
+    name: Build iOS
+    type: build
+    needs: [check]
+    params:
+      platform: ios
+      profile: production
+      message: ${{ github.sha }}
+
+  submit_ios:
+    name: Submit to TestFlight
+    type: submit
+    needs: [build_ios]
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production
