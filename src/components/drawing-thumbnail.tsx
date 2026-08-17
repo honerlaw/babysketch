@@ -2,7 +2,7 @@ import { useId } from 'react';
 import Svg, { ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
 import type { Drawing } from '@/types/drawing';
-import { type ColoringState, strokeToPath } from '@/lib/artwork-state';
+import { type ColoringState, shapeKey, strokeToPath } from '@/lib/artwork-state';
 import { INK, PAPER } from '@/lib/palette';
 
 type Props = {
@@ -32,7 +32,7 @@ export function DrawingThumbnail({ drawing, state, size }: Props) {
       </Defs>
       <Rect x={0} y={0} width={vw} height={vh} fill={PAPER} />
       {fillable.map(({ s, i }) => (
-        <Path key={`f${i}`} d={s.d} fill={state.fills[String(i)] ?? PAPER} />
+        <Path key={`f${i}`} d={s.d} fill={state.fills[shapeKey(s.d)] ?? PAPER} />
       ))}
       <G clipPath={`url(#${clipId})`}>
         {state.strokes.map((stroke, i) => (

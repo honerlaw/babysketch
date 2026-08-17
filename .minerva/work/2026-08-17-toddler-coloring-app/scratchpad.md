@@ -29,7 +29,8 @@ Carried forward from the proposal panel (fix before marking the related criterio
 
 The two checks the approach panel demanded before anything else:
 
-- **Multi-child `<ClipPath>` unions correctly.** Verified by rendering the real drawing
+- **Multi-child `<ClipPath>` unions correctly *against a standards SVG renderer*.**
+  Checked by rendering the real drawing
   data through the exact layer structure `ColoringCanvas` emits, with a stroke authored to
   run deliberately off the subject (`p: [2, 8, 30, 40, 55, 55, 95, 92]`), then rasterising
   with `qlmanage` (WebKit). On both the cat and the dolphin the stroke appears only inside
@@ -124,3 +125,72 @@ Carried into the review phase rather than fixed at the gate:
   `GestureDetector` runs `Gesture.Pan().minDistance(0)` whose `onBegin` already selects; the
   pan recogniser likely claims the touch first.
 - **[low] Only the web bundle was checked**, never the native Metro bundle.
+
+## Review triage 2026-08-17
+
+Twelve findings, from the completion panel's skeptic and a fresh-context code review.
+The triage panel accepted the disposition set 2/3; the dissent moved three of them and
+is recorded below because it was right.
+
+FIXED on this branch:
+
+1. **[high] Load race discarded the child's first edit.** `loadArtwork` resolved and
+   overwrote state unconditionally, so a tap before the file read landed was replaced by
+   the loaded content and the armed timer then persisted the stale version. The picture
+   and its undo history are now one state object with a `revision` counter, and a load
+   only applies while `revision === 0`.
+2. **[medium-high] Stale thumbnail after back-navigation.** expo-router emits `focus`
+   from a plain effect while react-native-screens keeps the popped screen mounted through
+   its pop animation, so the gallery could read all 52 files before the canvas's debounced
+   write landed. Fixed by a write-through memory cache in `artwork-store.ts` that
+   `loadArtwork` consults first, plus a flush before `router.back()` — the race is removed
+   rather than won on timing.
+3. **[medium] Saved fills were keyed by shape array index.** Now keyed by an FNV hash of
+   the region's own path data, so colours survive reordering and insertion and a region
+   whose geometry genuinely changed just loses its colour. Done now rather than deferred
+   for a specific reason: nothing has shipped, so no save files exist in the wild — the
+   same change after release would need a migration.
+4. **[low] Impure state updaters.** `setUndoStack` was called from inside `setState`'s
+   updater. One `Editor` state object makes every edit a single pure updater.
+6. **[high] Silent save failures.** `saveArtwork` now returns whether the write landed and
+   logs on failure; loads and clears log too. Scoped deliberately to logging — no
+   user-facing failure UI, which would be new chrome the wordless design never accounted
+   for and which could trip the wordlessness scan.
+7. **[medium] Over-stated clipping claim** — the Stage A note above now says "against a
+   standards SVG renderer" rather than implying native backends were covered.
+11. **[low] Dead tap handler** on each colour-wheel sector removed; the pan recogniser's
+   `onBegin` was already doing the work, and the comment now says so.
+
+Also added: the registry test now rejects two fillable regions with identical geometry in
+one drawing, since keying by geometry would make them share a fill.
+
+DEFERRED (`SUGGEST`) — recorded, not changed:
+
+5. Extract the duplicated three-layer SVG rendering shared by `coloring-canvas.tsx` and
+   `drawing-thumbnail.tsx`. Deferred on the triage skeptic's argument, which persuaded me:
+   it is a pure refactor of the exact rendering code whose native behaviour is unverified,
+   and bundling it with three real bug fixes right before shipping multiplies regression
+   risk for no correctness gain today.
+8. Make the wordlessness test match import provenance, not tag names, so an aliased `Text`
+   import cannot slip past.
+9. Turn the static-render DOM check into a CI-gated assertion. It also only covers 36 of 52
+   thumbnails, because `FlatList` virtualisation is doing its job.
+12. Verify the native Metro bundle, not only the web one.
+
+IGNORED:
+
+10. Gesture objects rebuilt every render. Deliberate and commented: it is what lets
+    `onFinalize` close over the current point list without reading a ref during render.
+
+## Open question that survives this unit 2026-08-17
+
+**The native rendering backends have never been exercised.** The clip-union check ran
+against WebKit; the gesture wiring for brush, bucket, wheel selection, undo and clear was
+never driven by a real finger; and the disk round-trip behind criterion 11 never ran. The
+triage skeptic's sharpest point was that finding 7 ("fix the wording") and finding 12
+("suggest") together dissolve what is really *one* load-bearing gap into two small ones.
+It is one gap, and it is stated as one here: **before this is put in front of an actual
+toddler, it needs a run on an iOS or Android simulator** covering paint containment, both
+colouring modes, wheel selection, undo, long-press clear, and a force-quit/relaunch. The
+fix for finding 2 in particular is a best-effort fix for a timing race that cannot be
+confirmed shut without a device.

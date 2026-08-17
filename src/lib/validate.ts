@@ -1,4 +1,5 @@
 import type { Drawing } from '@/types/drawing';
+import { shapeKey } from '@/lib/artwork-state';
 import { bboxContains, bboxMinorAxis, parsePath, pathBBox } from '@/lib/path';
 
 /**
@@ -65,6 +66,21 @@ export function validateDrawing(drawing: Drawing): string[] {
       errors.push(
         `${where(i)}: fillable region minor axis ${bboxMinorAxis(box).toFixed(1)} is below ${MIN_REGION_MINOR_AXIS}`,
       );
+    }
+  });
+
+  // Saved colours are keyed by a hash of the region's own path data, so two
+  // fillable regions with identical geometry in one drawing would share a key and
+  // always fill together. Authoring them as one region is what was meant anyway.
+  const seenGeometry = new Map<string, number>();
+  drawing.shapes.forEach((shape, i) => {
+    if (!shape.fillable) return;
+    const key = shapeKey(shape.d);
+    const first = seenGeometry.get(key);
+    if (first !== undefined) {
+      errors.push(`${where(i)}: identical geometry to ${where(first)} — they would share a fill`);
+    } else {
+      seenGeometry.set(key, i);
     }
   });
 

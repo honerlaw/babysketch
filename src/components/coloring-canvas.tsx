@@ -4,7 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
 import type { Drawing } from '@/types/drawing';
-import { type ColoringState, type Stroke, strokeToPath } from '@/lib/artwork-state';
+import { type ColoringState, type Stroke, shapeKey, strokeToPath } from '@/lib/artwork-state';
 import { INK, PAPER } from '@/lib/palette';
 
 /** Points closer than this in viewBox units are dropped — invisible, but much less data. */
@@ -19,7 +19,7 @@ type Props = {
   state: ColoringState;
   mode: CanvasMode;
   color: string;
-  onFillRegion: (shapeIndex: number) => void;
+  onFillRegion: (key: string) => void;
   onCommitStroke: (stroke: Stroke) => void;
 };
 
@@ -105,8 +105,8 @@ export function ColoringCanvas({
                 <Path
                   key={`f${i}`}
                   d={s.d}
-                  fill={state.fills[String(i)] ?? PAPER}
-                  onPress={mode === 'bucket' ? () => onFillRegion(i) : undefined}
+                  fill={state.fills[shapeKey(s.d)] ?? PAPER}
+                  onPress={mode === 'bucket' ? () => onFillRegion(shapeKey(s.d)) : undefined}
                 />
               ))}
 

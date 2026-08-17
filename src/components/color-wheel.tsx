@@ -29,8 +29,11 @@ export function ColorWheel({ color, onSelect }: Props) {
   const neutrals = swatchColors();
   const c = WHEEL_OUTER_R;
 
-  // Dragging around the ring scrubs through hues continuously, which is the
-  // "scroll through the colours" gesture rather than a hunt-and-peck tap.
+  // One recogniser handles both gestures: `onBegin` fires on the first touch, so a
+  // tap selects, and `onUpdate` keeps selecting as the finger sweeps, which is the
+  // "scroll through the colours" gesture. The sectors deliberately carry no
+  // `onPress` of their own — the pan claims the touch first, so a second handler
+  // would be dead code that only misleads the next reader.
   const scrub = useMemo(
     () =>
       Gesture.Pan()
@@ -59,7 +62,6 @@ export function ColorWheel({ color, onSelect }: Props) {
                 fill={hue}
                 stroke={hue === color ? INK : '#FFFFFF'}
                 strokeWidth={hue === color ? 4 : 2}
-                onPress={() => onSelect(hue)}
               />
             ))}
             <Circle cx={c} cy={c} r={WHEEL_CENTER_R} fill={color} stroke={INK} strokeWidth={3} />

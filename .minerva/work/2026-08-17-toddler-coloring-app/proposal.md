@@ -115,10 +115,14 @@ never leak past a line.
 
 Per-drawing JSON at `<documentDirectory>/artwork/<id>.json` via `expo-file-system`'s modern
 `File` / `Paths` class API (SDK 57 dropped the legacy `FileSystem.*` function API). Payload is
-`{ v: 1, fills: Record<string, string>, strokes: Stroke[] }`. Saves are debounced ~400ms after
+`{ v: 1, fills: Record<string, string>, strokes: Stroke[] }`, where each fill is keyed by a
+hash of its region's own path data rather than the region's index in the shapes array, so
+reordering or inserting a shape can never reapply saved colours to the wrong regions. Saves are debounced ~400ms after
 the last change, flushed when the canvas unmounts, and flushed again on an `AppState` transition
-away from `active` — without that last one, a toddler swiping the app away inside the debounce
-window would silently lose their most recent stroke. The loader returns blank state for an
+away from `active`, and once more immediately before back-navigation — without those, a
+toddler swiping the app away or tapping back inside the debounce window would silently lose
+their most recent stroke. A write-through memory cache sits in front of the files so the
+gallery reads the latest picture even while a write is still pending. The loader returns blank state for an
 unrecognized `v`, unparseable JSON, or a missing file, so a corrupt save degrades to an
 uncolored picture and never crashes. The module is split so that pure serialize/deserialize
 logic is testable with no Expo imports.

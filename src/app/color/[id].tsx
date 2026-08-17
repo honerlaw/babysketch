@@ -8,52 +8,67 @@ import { ColoringCanvas, type CanvasMode } from '@/components/coloring-canvas';
 import { IconButton } from '@/components/icon-button';
 import { getDrawing } from '@/drawings';
 import { type ColoringState, type Stroke, emptyState, pushUndo } from '@/lib/artwork-state';
+import { cacheArtwork, loadArtwork, saveArtwork } from '@/lib/artwork-store';
 import { applyClear, applyFill, applyStroke } from '@/lib/coloring-actions';
-import { loadArtwork, saveArtwork } from '@/lib/artwork-store';
 import { HUES } from '@/lib/palette';
 
 const SAVE_DEBOUNCE_MS = 400;
+
+/**
+ * The picture and its undo history are one piece of state, not two. Keeping them
+ * together lets every edit be a single pure updater; the earlier shape called
+ * `setUndoStack` from inside `setState`'s updater, which is exactly the impurity
+ * that makes an edit record its undo entry twice under StrictMode and leaves the
+ * first undo tap doing nothing.
+ */
+type Editor = { art: ColoringState; undo: ColoringState[] };
 
 export default function ColorScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const drawing = useMemo(() => (id ? getDrawing(id) : undefined), [id]);
 
-  const [state, setState] = useState<ColoringState>(emptyState);
-  const [undoStack, setUndoStack] = useState<ColoringState[]>([]);
+  const [editor, setEditor] = useState<Editor>({ art: emptyState(), undo: [] });
+  const [revision, setRevision] = useState(0);
   const [mode, setMode] = useState<CanvasMode>('brush');
   const [color, setColor] = useState<string>(HUES[0]);
 
-  const latest = useRef(state);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dirty = useRef(false);
+  const pending = useRef<{ id: string; state: ColoringState } | null>(null);
 
-  useEffect(() => {
-    latest.current = state;
-  }, [state]);
-
+  // `revision === 0` means the child has not touched this picture yet. Without that
+  // guard a slow file read would resolve *after* a first eager tap and overwrite it,
+  // and the armed timer would then persist the stale content — the child's first
+  // mark disappearing for good.
   useEffect(() => {
     if (!id) return;
     let alive = true;
     loadArtwork(id).then((loaded) => {
-      if (alive) setState(loaded);
+      if (alive) setEditor((prev) => (revision === 0 ? { art: loaded, undo: [] } : prev));
     });
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const flush = useCallback(() => {
-    if (!id || !dirty.current) return;
-    dirty.current = false;
-    void saveArtwork(id, latest.current);
-  }, [id]);
+    const job = pending.current;
+    if (!job) return;
+    pending.current = null;
+    void saveArtwork(job.id, job.state);
+  }, []);
 
-  const scheduleSave = useCallback(() => {
-    dirty.current = true;
+  // Cache immediately, write to disk on a delay. The cache is what the gallery reads,
+  // so a thumbnail is correct the moment the child navigates back rather than
+  // whenever the debounced write happens to land.
+  useEffect(() => {
+    if (!id || revision === 0) return;
+    cacheArtwork(id, editor.art);
+    pending.current = { id, state: editor.art };
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
-  }, [flush]);
+  }, [id, revision, editor.art, flush]);
 
   // Flush on unmount and on backgrounding — a toddler swiping the app away inside
   // the debounce window would otherwise lose their last stroke.
@@ -69,42 +84,32 @@ export default function ColorScreen() {
   }, [flush]);
 
   const mutate = useCallback((next: (prev: ColoringState) => ColoringState) => {
-    setState((prev) => {
-      setUndoStack((stack) => pushUndo(stack, prev));
-      return next(prev);
-    });
+    setEditor((prev) => ({ art: next(prev.art), undo: pushUndo(prev.undo, prev.art) }));
+    setRevision((r) => r + 1);
   }, []);
 
   const handleFill = useCallback(
-    (shapeIndex: number) => {
-      mutate((prev) => applyFill(prev, shapeIndex, color));
-      scheduleSave();
-    },
-    [color, mutate, scheduleSave],
+    (key: string) => mutate((prev) => applyFill(prev, key, color)),
+    [color, mutate],
   );
 
   const handleStroke = useCallback(
-    (stroke: Stroke) => {
-      mutate((prev) => applyStroke(prev, stroke));
-      scheduleSave();
-    },
-    [mutate, scheduleSave],
+    (stroke: Stroke) => mutate((prev) => applyStroke(prev, stroke)),
+    [mutate],
   );
 
   const handleUndo = useCallback(() => {
-    setUndoStack((stack) => {
-      if (stack.length === 0) return stack;
-      setState(stack[stack.length - 1]);
-      return stack.slice(0, -1);
-    });
-    scheduleSave();
-  }, [scheduleSave]);
+    setEditor((prev) =>
+      prev.undo.length === 0
+        ? prev
+        : { art: prev.undo[prev.undo.length - 1], undo: prev.undo.slice(0, -1) },
+    );
+    setRevision((r) => r + 1);
+  }, []);
 
-  // Long-press only, and it pushes the pre-clear state so one undo brings it back.
-  const handleClear = useCallback(() => {
-    mutate(applyClear);
-    scheduleSave();
-  }, [mutate, scheduleSave]);
+  // Long-press only, and it records the pre-clear picture, so one undo tap brings
+  // a whole drawing back.
+  const handleClear = useCallback(() => mutate(applyClear), [mutate]);
 
   if (!drawing) {
     return <SafeAreaView style={styles.safe} />;
@@ -113,7 +118,14 @@ export default function ColorScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.toolbar}>
-        <IconButton icon="back" label="Back to the pictures" onPress={() => router.back()} />
+        <IconButton
+          icon="back"
+          label="Back to the pictures"
+          onPress={() => {
+            flush();
+            router.back();
+          }}
+        />
         <IconButton
           icon="brush"
           label="Draw with your finger"
@@ -131,14 +143,14 @@ export default function ColorScreen() {
         <IconButton
           icon="undo"
           label="Undo"
-          onPress={undoStack.length > 0 ? handleUndo : undefined}
+          onPress={editor.undo.length > 0 ? handleUndo : undefined}
         />
         <IconButton icon="trash" label="Press and hold to start over" onLongPress={handleClear} />
       </View>
 
       <ColoringCanvas
         drawing={drawing}
-        state={state}
+        state={editor.art}
         mode={mode}
         color={color}
         onFillRegion={handleFill}

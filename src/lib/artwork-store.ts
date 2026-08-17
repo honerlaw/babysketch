@@ -4,6 +4,22 @@ import { type ColoringState, deserialize, emptyState, serialize } from '@/lib/ar
 
 const DIR_NAME = 'artwork';
 
+/**
+ * Write-through cache of what each drawing currently looks like. It exists because
+ * the gallery re-reads on focus while the canvas is still finishing its debounced
+ * write: react-native-screens keeps the popped screen mounted through its pop
+ * animation, so a child who colours a region and immediately taps back could
+ * otherwise see the gallery read the file before the write landed, leaving a stale
+ * thumbnail until the next focus. Reading memory first removes the race rather
+ * than trying to win it.
+ */
+const cache = new Map<string, ColoringState>();
+
+/** Record the latest state immediately, ahead of the debounced disk write. */
+export function cacheArtwork(id: string, state: ColoringState): void {
+  cache.set(id, state);
+}
+
 const artworkDir = () => new Directory(Paths.document, DIR_NAME);
 
 function ensureDir(): Directory {
@@ -19,22 +35,37 @@ function ensureDir(): Directory {
 const fileFor = (id: string) => new File(ensureDir(), `${id}.json`);
 
 export async function loadArtwork(id: string): Promise<ColoringState> {
+  const cached = cache.get(id);
+  if (cached) return cached;
   try {
     const file = fileFor(id);
     if (!file.exists) return emptyState();
-    return deserialize(await file.text());
-  } catch {
+    const state = deserialize(await file.text());
+    cache.set(id, state);
+    return state;
+  } catch (error) {
+    console.warn(`[babysketch] could not read artwork "${id}"`, error);
     return emptyState();
   }
 }
 
-export async function saveArtwork(id: string, state: ColoringState): Promise<void> {
+/**
+ * Returns whether the write landed. Failing quietly would mean a child's colouring
+ * could vanish — disk full, permission denied, storage evicted — with nothing
+ * anywhere recording that it happened. The app still must not crash on a failed
+ * autosave, so this reports rather than throws, and the cache keeps the picture
+ * correct for this session either way.
+ */
+export async function saveArtwork(id: string, state: ColoringState): Promise<boolean> {
+  cache.set(id, state);
   try {
     const file = fileFor(id);
     file.create({ overwrite: true, intermediates: true });
     file.write(serialize(state));
-  } catch {
-    // Losing one autosave is survivable; taking the canvas down with it is not.
+    return true;
+  } catch (error) {
+    console.warn(`[babysketch] could not save artwork "${id}"`, error);
+    return false;
   }
 }
 
@@ -49,10 +80,11 @@ export async function loadAllArtwork(ids: readonly string[]): Promise<Record<str
 }
 
 export async function clearArtwork(id: string): Promise<void> {
+  cache.set(id, emptyState());
   try {
     const file = fileFor(id);
     if (file.exists) file.delete();
-  } catch {
-    // Nothing to recover — the caller has already reset in-memory state.
+  } catch (error) {
+    console.warn(`[babysketch] could not clear artwork "${id}"`, error);
   }
 }

@@ -21,6 +21,25 @@ export const MAX_STROKES = 400;
 
 export const emptyState = (): ColoringState => ({ fills: {}, strokes: [] });
 
+/**
+ * The key a region's colour is saved under. Deliberately derived from the region's
+ * own geometry rather than its position in the shapes array: an array index means
+ * that inserting a spot or reordering ears-before-head in any of the 52 drawings
+ * would silently reapply every saved colour to the wrong region, and a version
+ * check cannot catch that because the payload's shape is unchanged — only its
+ * meaning. Keyed by geometry, colours survive reordering and insertion, and a
+ * region whose shape genuinely changed simply loses its colour, which is the
+ * safe direction to fail.
+ */
+export function shapeKey(d: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < d.length; i++) {
+    hash ^= d.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
+}
+
 export const isEmptyState = (s: ColoringState) =>
   Object.keys(s.fills).length === 0 && s.strokes.length === 0;
 

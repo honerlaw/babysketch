@@ -15,10 +15,10 @@ import {
 /** Bucket fill: sets one region's colour and touches nothing else. */
 export function applyFill(
   state: ColoringState,
-  shapeIndex: number,
+  key: string,
   color: string,
 ): ColoringState {
-  return { ...state, fills: { ...state.fills, [String(shapeIndex)]: color } };
+  return { ...state, fills: { ...state.fills, [key]: color } };
 }
 
 /** Freehand: appends a committed stroke, respecting the growth ceiling. */

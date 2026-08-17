@@ -1,4 +1,5 @@
 import {
+  shapeKey,
   MAX_POINTS_PER_STROKE,
   MAX_STROKES,
   MAX_UNDO,
@@ -92,5 +93,26 @@ describe('strokeToPath', () => {
 
   it('returns empty for an empty stroke', () => {
     expect(strokeToPath({ c: '#000', w: 7, p: [] })).toBe('');
+  });
+});
+
+describe('shapeKey', () => {
+  it('is stable for the same geometry', () => {
+    expect(shapeKey('M 0 0 L 5 5 Z')).toBe(shapeKey('M 0 0 L 5 5 Z'));
+  });
+
+  it('differs for different geometry, so colours do not bleed between regions', () => {
+    expect(shapeKey('M 0 0 L 5 5 Z')).not.toBe(shapeKey('M 0 0 L 6 5 Z'));
+  });
+
+  it('does not depend on position in the shapes array, which is the whole point', () => {
+    const shapes = ['M 1 1 L 2 2 Z', 'M 3 3 L 4 4 Z'];
+    const before = shapes.map(shapeKey);
+    const after = [...shapes].reverse().map(shapeKey);
+    expect(new Set(before)).toEqual(new Set(after));
+  });
+
+  it('produces a short key, keeping saved files small', () => {
+    expect(shapeKey('M 0 0 L 5 5 Z').length).toBeLessThanOrEqual(7);
   });
 });
