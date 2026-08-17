@@ -1,0 +1,32 @@
+name: Check
+
+# Keeps typecheck, lint and tests running on every pull request and every merge,
+# now that shipping has moved to tags. Without this, moving the deploy workflow
+# to tags would have left the repository with no CI at all between releases.
+on:
+  pull_request:
+    branches: ['main']
+  push:
+    branches: ['main']
+
+concurrency:
+  group: ${{ workflow.filename }}-${{ github.ref }}
+  cancel_in_progress: true
+
+defaults:
+  image: sdk-57
+
+jobs:
+  check:
+    name: Typecheck, lint and test
+    steps:
+      - uses: eas/checkout
+      # Installs with `npm ci`, so a lockfile that has drifted out of sync with
+      # the npm EAS runs fails here in seconds rather than partway into a build.
+      - uses: eas/install_node_modules
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npx expo lint
+      - name: Test
+        run: npx jest

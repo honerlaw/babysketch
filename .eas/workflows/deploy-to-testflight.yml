@@ -1,14 +1,18 @@
 name: Deploy to TestFlight
 
-# Squash-merging a PR pushes a commit to main, so this fires on every merge.
+# Tag-triggered, not merge-triggered: shipping to TestFlight is a deliberate act.
+# Merging a doc fix should not cost build minutes or add a build for testers to
+# wade through. Cut a release with:
+#
+#   git tag v1.0.1 && git push origin v1.0.1
+#
 # Requires the GitHub repository to be connected to the EAS project — without
-# that link, push triggers never reach EAS and nothing runs.
+# that link the push trigger never reaches EAS and nothing runs.
 on:
   push:
-    branches: ['main']
+    tags: ['v*']
 
-# A newer merge supersedes an in-flight run: only the newest commit on main is
-# worth shipping, and build numbers auto-increment either way.
+# A newer tag supersedes an in-flight run.
 concurrency:
   group: ${{ workflow.filename }}-${{ github.ref }}
   cancel_in_progress: true
@@ -17,11 +21,9 @@ defaults:
   image: sdk-57
 
 jobs:
-  # A cheap gate ahead of an expensive build. Typecheck, lint and the suite take
-  # seconds; an iOS build takes minutes of worker time. This also runs
-  # `npm ci` first, which is exactly what caught the lockfile/npm-version
-  # mismatch that broke the first build — so drift now fails here, cheaply,
-  # instead of a third of the way into a build.
+  # Re-run the gate here rather than trusting that main was green when the tag
+  # was cut: a tag can point at any commit, including one that never went
+  # through a pull request.
   check:
     name: Typecheck, lint and test
     steps:
@@ -41,7 +43,7 @@ jobs:
     params:
       platform: ios
       profile: production
-      message: ${{ github.sha }}
+      message: ${{ github.ref }}
 
   submit_ios:
     name: Submit to TestFlight
